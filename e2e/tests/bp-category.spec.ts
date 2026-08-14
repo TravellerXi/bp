@@ -19,12 +19,36 @@ const submit = async (page, systolic: number, diastolic: number) => {
   await page.click('input[type="submit"]');
 };
 
+const isHttps = (process.env.BASE_URL ?? '').startsWith('https');
+
+// A deployed App Service serves http and https on the default ports, so swapping
+// the scheme is enough. A local Kestrel instance listens on two different ports,
+// so the plain-text origin has to be supplied explicitly via HTTP_BASE_URL.
+const httpOrigin = (baseURL: string) =>
+  process.env.HTTP_BASE_URL ?? baseURL.replace(/^https:/, 'http:').replace(/:\d+$/, '');
+
 test.describe('BP category calculator', () => {
-  test('the form is served over HTTPS and renders', async ({ page }) => {
+  test('the form renders', async ({ page }) => {
     const response = await page.goto('/');
     expect(response?.status()).toBe(200);
-    expect(page.url()).toMatch(/^https:/);
     await expect(page.getByRole('heading', { name: /BP Category Calculator/i })).toBeVisible();
+  });
+
+  test('http is redirected to https', async ({ request, baseURL }) => {
+    test.skip(!isHttps, 'Only meaningful against an https environment');
+    const res = await request.get(httpOrigin(baseURL!), { maxRedirects: 0 });
+    expect([301, 302, 307, 308]).toContain(res.status());
+    expect(res.headers()['location']).toMatch(/^https:/);
+  });
+
+  test('security headers are present', async ({ request }) => {
+    const res = await request.get('/');
+    const h = res.headers();
+    expect(h['x-frame-options']).toBe('DENY');
+    expect(h['x-content-type-options']).toBe('nosniff');
+    expect(h['content-security-policy']).toContain("default-src 'self'");
+    expect(h['cache-control']).toContain('no-store');
+    expect(h['server']).toBeUndefined();
   });
 
   for (const c of cases) {

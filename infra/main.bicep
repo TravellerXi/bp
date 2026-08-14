@@ -115,7 +115,7 @@ resource stagingSlot 'Microsoft.Web/sites/slots@2024-11-01' = if (isProd) {
 output appHostName string = appService.properties.defaultHostName
 
 @description('Hostname of the staging slot (prod only).')
-output stagingSlotHostName string = isProd ? stagingSlot.properties.defaultHostName : ''
+output stagingSlotHostName string = isProd ? stagingSlot!.properties.defaultHostName : ''
 
 output appServiceName string = appService.name
 output appInsightsName string = appInsights.name

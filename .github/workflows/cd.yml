@@ -136,7 +136,7 @@ jobs:
       - name: Install Playwright
         working-directory: e2e
         run: |
-          npm install --no-audit --no-fund
+          npm ci
           npx playwright install --with-deps chromium firefox webkit
       - name: E2E tests (chromium, firefox, webkit)
         working-directory: e2e

@@ -15,6 +15,8 @@ export default defineConfig({
     baseURL,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
+    // The ASP.NET Core dev certificate is self-signed when running locally.
+    ignoreHTTPSErrors: baseURL.includes('localhost'),
   },
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },

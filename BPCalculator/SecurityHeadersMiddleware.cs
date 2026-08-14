@@ -30,6 +30,11 @@ namespace BPCalculator
 
                 headers["Referrer-Policy"] = "no-referrer";
 
+                // ZAP: Re-examine Cache-control Directives. The result page reflects
+                // submitted health data, so it must not be cached by shared proxies.
+                headers["Cache-Control"] = "no-store, no-cache, must-revalidate";
+                headers["Pragma"] = "no-cache";
+
                 // ZAP: Server Leaks Information via "Server" HTTP Response Header
                 headers.Remove("Server");
                 headers.Remove("X-Powered-By");

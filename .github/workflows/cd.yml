@@ -6,16 +6,24 @@ on:
     types: [completed]
     branches: [master]
   workflow_dispatch:
+    inputs:
+      ci_run_id:
+        description: 'Run id of the CI workflow whose artifact should be deployed'
+        required: true
+        type: string
 
 permissions:
   id-token: write        # OIDC federated credential, no long-lived secret
   contents: read
+  actions: read          # required to download an artifact from another workflow run
 
 env:
   DOTNET_VERSION: '9.0.x'
   NAME_PREFIX: ${{ vars.NAME_PREFIX }}
   RESOURCE_GROUP: ${{ vars.RESOURCE_GROUP }}
   LOCATION: northeurope
+  # A manual run must name the CI run to promote; there is no artifact on this run.
+  CI_RUN_ID: ${{ github.event.workflow_run.id || inputs.ci_run_id }}
 
 jobs:
   # ---------------------------------------------------------------- dev
@@ -60,7 +68,7 @@ jobs:
           name: webapp
           path: ./publish
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          run-id: ${{ github.event.workflow_run.id || github.run_id }}
+          run-id: ${{ env.CI_RUN_ID }}
 
       - uses: azure/webapps-deploy@v3
         with:
@@ -99,7 +107,7 @@ jobs:
           name: webapp
           path: ./publish
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          run-id: ${{ github.event.workflow_run.id || github.run_id }}
+          run-id: ${{ env.CI_RUN_ID }}
 
       - uses: azure/webapps-deploy@v3
         with:
@@ -127,7 +135,7 @@ jobs:
           path: e2e/playwright-report
 
       - name: OWASP ZAP full scan
-        uses: zaproxy/action-full-scan@v0.12.0
+        uses: zaproxy/action-full-scan@v0.13.0
         with:
           target: https://${{ steps.infra.outputs.host }}
           rules_file_name: .zap/rules.tsv
@@ -148,7 +156,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: staging       # manual pre-approval configured here
-      url: https://${{ env.NAME_PREFIX }}-bpcalculator-prod-staging.azurewebsites.net
+      url: https://${{ vars.NAME_PREFIX }}-bpcalculator-prod-staging.azurewebsites.net
     steps:
       - uses: actions/checkout@v4
 
@@ -170,7 +178,7 @@ jobs:
           name: webapp
           path: ./publish
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          run-id: ${{ github.event.workflow_run.id || github.run_id }}
+          run-id: ${{ env.CI_RUN_ID }}
 
       - uses: azure/webapps-deploy@v3
         with:
@@ -192,7 +200,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: production    # second manual pre-approval
-      url: https://${{ env.NAME_PREFIX }}-bpcalculator-prod.azurewebsites.net
+      url: https://${{ vars.NAME_PREFIX }}-bpcalculator-prod.azurewebsites.net
     steps:
       - uses: azure/login@v2
         with:

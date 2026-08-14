@@ -1,0 +1,178 @@
+{
+  "BPCalculator.dll": {
+    "C:\\Users\\yuxi\\Documents\\Continuous Software Delivery\\assignments\\CSFDH6000-CSD-CA1-Project\\bp\\BPCalculator\\BloodPressure.cs": {
+      "BPCalculator.BloodPressure": {
+        "System.Int32 BPCalculator.BloodPressure::get_Systolic()": {
+          "Lines": {
+            "38": 546
+          },
+          "Branches": []
+        },
+        "System.Int32 BPCalculator.BloodPressure::get_Diastolic()": {
+          "Lines": {
+            "41": 768
+          },
+          "Branches": []
+        },
+        "BPCalculator.BPCategory BPCalculator.BloodPressure::get_Category()": {
+          "Lines": {
+            "52": 25,
+            "54": 6,
+            "57": 19,
+            "59": 7,
+            "62": 12,
+            "64": 5,
+            "67": 7
+          },
+          "Branches": [
+            {
+              "Line": 52,
+              "Offset": 11,
+              "EndOffset": 13,
+              "Path": 0,
+              "Ordinal": 0,
+              "Hits": 21
+            },
+            {
+              "Line": 52,
+              "Offset": 11,
+              "EndOffset": 23,
+              "Path": 1,
+              "Ordinal": 1,
+              "Hits": 6
+            },
+            {
+              "Line": 52,
+              "Offset": 21,
+              "EndOffset": 23,
+              "Path": 0,
+              "Ordinal": 2,
+              "Hits": 6
+            },
+            {
+              "Line": 52,
+              "Offset": 21,
+              "EndOffset": 25,
+              "Path": 1,
+              "Ordinal": 3,
+              "Hits": 19
+            },
+            {
+              "Line": 57,
+              "Offset": 33,
+              "EndOffset": 35,
+              "Path": 0,
+              "Ordinal": 4,
+              "Hits": 15
+            },
+            {
+              "Line": 57,
+              "Offset": 33,
+              "EndOffset": 45,
+              "Path": 1,
+              "Ordinal": 5,
+              "Hits": 7
+            },
+            {
+              "Line": 57,
+              "Offset": 43,
+              "EndOffset": 45,
+              "Path": 0,
+              "Ordinal": 6,
+              "Hits": 7
+            },
+            {
+              "Line": 57,
+              "Offset": 43,
+              "EndOffset": 47,
+              "Path": 1,
+              "Ordinal": 7,
+              "Hits": 12
+            },
+            {
+              "Line": 62,
+              "Offset": 55,
+              "EndOffset": 57,
+              "Path": 0,
+              "Ordinal": 8,
+              "Hits": 7
+            },
+            {
+              "Line": 62,
+              "Offset": 65,
+              "EndOffset": 67,
+              "Path": 0,
+              "Ordinal": 10,
+              "Hits": 5
+            },
+            {
+              "Line": 62,
+              "Offset": 55,
+              "EndOffset": 69,
+              "Path": 1,
+              "Ordinal": 9,
+              "Hits": 7
+            },
+            {
+              "Line": 62,
+              "Offset": 65,
+              "EndOffset": 69,
+              "Path": 1,
+              "Ordinal": 11,
+              "Hits": 7
+            }
+          ]
+        },
+        "System.Double BPCalculator.BloodPressure::get_MeanArterialPressure()": {
+          "Lines": {
+            "82": 235
+          },
+          "Branches": []
+        },
+        "BPCalculator.MapCategory BPCalculator.BloodPressure::get_MeanArterialPressureCategory()": {
+          "Lines": {
+            "92": 8,
+            "94": 3,
+            "97": 5,
+            "99": 3,
+            "102": 2
+          },
+          "Branches": [
+            {
+              "Line": 92,
+              "Offset": 15,
+              "EndOffset": 17,
+              "Path": 0,
+              "Ordinal": 0,
+              "Hits": 3
+            },
+            {
+              "Line": 92,
+              "Offset": 15,
+              "EndOffset": 19,
+              "Path": 1,
+              "Ordinal": 1,
+              "Hits": 5
+            },
+            {
+              "Line": 97,
+              "Offset": 34,
+              "EndOffset": 36,
+              "Path": 0,
+              "Ordinal": 2,
+              "Hits": 3
+            },
+            {
+              "Line": 97,
+              "Offset": 34,
+              "EndOffset": 38,
+              "Path": 1,
+              "Ordinal": 3,
+              "Hits": 2
+            }
+          ]
+        }
+      }
+    }
+  }
+}

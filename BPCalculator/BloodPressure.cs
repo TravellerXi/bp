@@ -11,6 +11,14 @@ namespace BPCalculator
         [Display(Name = "High Blood Pressure")] High
     };
 
+    // Mean arterial pressure bands
+    public enum MapCategory
+    {
+        [Display(Name = "Low Mean Arterial Pressure")] Low,
+        [Display(Name = "Normal Mean Arterial Pressure")] Normal,
+        [Display(Name = "High Mean Arterial Pressure")] High
+    };
+
     public class BloodPressure
     {
         public const int SystolicMin = 70;
@@ -57,6 +65,41 @@ namespace BPCalculator
                 }
 
                 return BPCategory.Ideal;
+            }
+        }
+
+        // Mean arterial pressure band boundaries. Lower limits are inclusive,
+        // matching the convention used for BPCategory.
+        public const double HighMap = 100.0;
+        public const double NormalMap = 70.0;
+
+        /// <summary>
+        /// Mean arterial pressure: the average pressure over one cardiac cycle.
+        /// Diastole lasts roughly twice as long as systole, hence the 1/3 weighting
+        /// of the pulse pressure. Rounded to one decimal place for display.
+        /// </summary>
+        public double MeanArterialPressure =>
+            Math.Round(Diastolic + ((Systolic - Diastolic) / 3.0), 1);
+
+        /// <summary>
+        /// Perfusion band for the mean arterial pressure. A MAP below 70 mmHg is
+        /// generally regarded as too low to perfuse the major organs reliably.
+        /// </summary>
+        public MapCategory MeanArterialPressureCategory
+        {
+            get
+            {
+                if (MeanArterialPressure >= HighMap)
+                {
+                    return MapCategory.High;
+                }
+
+                if (MeanArterialPressure >= NormalMap)
+                {
+                    return MapCategory.Normal;
+                }
+
+                return MapCategory.Low;
             }
         }
     }

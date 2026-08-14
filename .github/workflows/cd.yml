@@ -27,9 +27,42 @@ env:
   CI_RUN_ID: ${{ github.event.workflow_run.id || inputs.ci_run_id }}
 
 jobs:
+  # ---------------------------------------------------------- preflight
+  # Deployment needs a federated Azure credential and the two repository
+  # variables. Without them azure/login fails and every downstream job dies with
+  # it, which reports a broken pipeline rather than an unconfigured one. The same
+  # mistake once cost this project its entire CI evidence set, so the check is
+  # explicit here.
+  preflight:
+    name: Check deployment configuration
+    runs-on: ubuntu-latest
+    outputs:
+      configured: ${{ steps.check.outputs.configured }}
+    steps:
+      - id: check
+        shell: bash
+        env:
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+        run: |
+          missing=""
+          [ -z "$AZURE_CLIENT_ID" ]       && missing="$missing AZURE_CLIENT_ID"
+          [ -z "$AZURE_TENANT_ID" ]       && missing="$missing AZURE_TENANT_ID"
+          [ -z "$AZURE_SUBSCRIPTION_ID" ] && missing="$missing AZURE_SUBSCRIPTION_ID"
+          [ -z "$NAME_PREFIX" ]           && missing="$missing NAME_PREFIX"
+          [ -z "$RESOURCE_GROUP" ]        && missing="$missing RESOURCE_GROUP"
+          if [ -n "$missing" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Deployment skipped. Not configured:$missing"
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
   # ---------------------------------------------------------------- dev
   dev:
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    needs: preflight
+    if: ${{ needs.preflight.outputs.configured == 'true' && (github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success') }}
     name: Provision + deploy to dev
     runs-on: ubuntu-latest
     environment:

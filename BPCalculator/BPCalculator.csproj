@@ -2,6 +2,13 @@
 
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Surface NuGet advisories as build errors rather than warnings. -->
+    <NuGetAudit>true</NuGetAudit>
+    <NuGetAuditMode>all</NuGetAuditMode>
+    <NuGetAuditLevel>low</NuGetAuditLevel>
+    <WarningsAsErrors>NU1901;NU1902;NU1903;NU1904</WarningsAsErrors>
   </PropertyGroup>
 
   <ItemGroup>
@@ -11,12 +18,15 @@
     <None Remove="Data\**" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Microsoft.ApplicationInsights.AspNetCore" Version="2.22.0" />
+  </ItemGroup>
 
-  <ItemGroup>
-    <PackageReference Include="Microsoft.VisualStudio.Web.CodeGeneration.Design" Version="2.0.3" />
-  </ItemGroup>
-  <ItemGroup>
-    <DotNetCliToolReference Include="Microsoft.VisualStudio.Web.CodeGeneration.Tools" Version="2.0.3" />
-  </ItemGroup>
+  <!--
+    Removed as part of the dependency-checking remediation:
+      Microsoft.VisualStudio.Web.CodeGeneration.Design 2.0.3 (2017, design-time scaffolding only)
+      DotNetCliToolReference Microsoft.VisualStudio.Web.CodeGeneration.Tools 2.0.3
+    Neither is used at runtime, and DotNetCliToolReference has been obsolete since .NET Core 3.0.
+  -->
 
 </Project>

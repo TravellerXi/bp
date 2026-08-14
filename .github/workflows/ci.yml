@@ -1,0 +1,132 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+env:
+  DOTNET_VERSION: '9.0.x'
+  BUILD_CONFIGURATION: Release
+
+jobs:
+  build-and-test:
+    name: Build, unit + BDD tests, coverage
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # SonarCloud needs full history for new-code detection
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'      # required by the SonarScanner
+
+      - name: Cache SonarCloud scanner
+        uses: actions/cache@v4
+        with:
+          path: ~/.sonar/scanner
+          key: ${{ runner.os }}-sonar-scanner
+
+      - name: Install SonarCloud scanner
+        run: dotnet tool install --global dotnet-sonarscanner
+
+      - name: Begin SonarCloud analysis
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: >
+          dotnet sonarscanner begin
+          /k:"${{ vars.SONAR_PROJECT_KEY }}"
+          /o:"${{ vars.SONAR_ORGANIZATION }}"
+          /d:sonar.token="$env:SONAR_TOKEN"
+          /d:sonar.host.url="https://sonarcloud.io"
+          /d:sonar.cs.opencover.reportsPaths="**/coverage.opencover.xml"
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --no-restore --configuration $env:BUILD_CONFIGURATION
+
+      - name: Unit tests + coverage
+        run: >
+          dotnet test BPCalculator.UnitTests/BPCalculator.UnitTests.csproj
+          --no-build --configuration $env:BUILD_CONFIGURATION
+          --logger "trx;LogFileName=unit-tests.trx"
+          /p:CollectCoverage=true
+          /p:CoverletOutputFormat=opencover
+          /p:CoverletOutput=./coverage.opencover.xml
+          /p:Threshold=80 /p:ThresholdType=line /p:ThresholdStat=total
+
+      - name: BDD tests (Reqnroll / Gherkin)
+        run: >
+          dotnet test BPCalculator.BddTests/BPCalculator.BddTests.csproj
+          --no-build --configuration $env:BUILD_CONFIGURATION
+          --logger "trx;LogFileName=bdd-tests.trx"
+
+      - name: End SonarCloud analysis
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: dotnet sonarscanner end /d:sonar.token="$env:SONAR_TOKEN"
+
+      - name: Publish web app
+        run: >
+          dotnet publish BPCalculator/BPCalculator.csproj
+          --no-build --configuration $env:BUILD_CONFIGURATION
+          --output ${{ github.workspace }}/publish
+
+      - name: Upload web artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: webapp
+          path: ${{ github.workspace }}/publish
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: '**/*.trx'
+
+  dependency-check:
+    name: Dependency vulnerability scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      # Fails the job when any transitive or direct package has a known advisory.
+      - name: dotnet list package --vulnerable
+        shell: bash
+        run: |
+          dotnet restore
+          dotnet list package --vulnerable --include-transitive > vulnerable.txt
+          cat vulnerable.txt
+          if grep -qiE '\b(Critical|High|Moderate)\b' vulnerable.txt; then
+            echo "::error::Vulnerable NuGet packages detected"
+            exit 1
+          fi
+
+      - name: OWASP Dependency-Check
+        uses: dependency-check/Dependency-Check_Action@main
+        with:
+          project: BPCalculator
+          path: '.'
+          format: 'HTML'
+          args: '--failOnCVSS 7 --enableRetired'
+
+      - name: Upload Dependency-Check report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-check-report
+          path: reports

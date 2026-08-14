@@ -8,7 +8,7 @@ namespace BPCalculator.Pages
     public class BloodPressureModel : PageModel
     {
         [BindProperty]                              // bound on POST
-        public BloodPressure BP { get; set; }
+        public BloodPressure BP { get; set; } = new();
 
         // setup initial data
         public void OnGet()

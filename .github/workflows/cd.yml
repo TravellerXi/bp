@@ -204,11 +204,16 @@ jobs:
           package: ./publish
 
       - name: Smoke test the slot before it is eligible for swap
+        shell: bash
         run: |
           url="https://${NAME_PREFIX}-bpcalculator-prod-staging.azurewebsites.net"
-          code=$(curl -s -o /dev/null -w '%{http_code}' --retry 5 --retry-delay 10 "$url")
-          echo "smoke test returned $code"
-          test "$code" = "200"
+          # Assert on the body. A status-code probe passes against a response whose
+          # headers are fine but whose body is truncated - the exact failure this
+          # project shipped and had to fix. --fail-with-body also surfaces the
+          # transfer error (curl 56) that a truncated body produces.
+          body=$(curl -sS --fail-with-body --retry 5 --retry-delay 10 "$url")
+          grep -q 'BP Category Calculator' <<< "$body"
+          echo "smoke test ok: ${#body} bytes, expected content present"
 
   # ------------------------------------------------- swap into production
   production:
@@ -237,11 +242,12 @@ jobs:
 
       - name: Post-swap smoke test
         id: postswap
+        shell: bash
         run: |
           url="https://${NAME_PREFIX}-bpcalculator-prod.azurewebsites.net"
-          code=$(curl -s -o /dev/null -w '%{http_code}' --retry 5 --retry-delay 10 "$url")
-          echo "production returned $code"
-          test "$code" = "200"
+          body=$(curl -sS --fail-with-body --retry 5 --retry-delay 10 "$url")
+          grep -q 'BP Category Calculator' <<< "$body"
+          echo "production ok: ${#body} bytes, expected content present"
 
       # Green side of blue/green: the previous production instance is sitting in
       # the slot, so recovery is the same swap in reverse.

@@ -44,3 +44,19 @@ test.describe('BP category calculator', () => {
     await expect(page.locator('.text-danger')).toContainText('Invalid Systolic Value');
   });
 });
+
+test.describe('Mean arterial pressure', () => {
+  const mapCases = [
+    { systolic: 120, diastolic: 80, map: '93.3', band: 'Normal Mean Arterial Pressure' },
+    { systolic: 150, diastolic: 90, map: '110', band: 'High Mean Arterial Pressure' },
+    { systolic: 89, diastolic: 60, map: '69.7', band: 'Low Mean Arterial Pressure' },
+  ];
+
+  for (const c of mapCases) {
+    test(`${c.systolic}/${c.diastolic} reports a MAP of ${c.map}`, async ({ page }) => {
+      await submit(page, c.systolic, c.diastolic);
+      await expect(page.getByTestId('map-value')).toContainText(c.map);
+      await expect(page.getByTestId('map-category')).toContainText(c.band);
+    });
+  }
+});

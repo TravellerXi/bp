@@ -10,6 +10,8 @@ namespace BPCalculator.BddTests.Steps
     {
         private readonly BloodPressure _bp = new();
         private BPCategory _result;
+        private double _map;
+        private MapCategory _mapBand;
 
         [Given(@"a systolic reading of (.*)")]
         public void GivenASystolicReadingOf(int systolic) => _bp.Systolic = systolic;
@@ -23,5 +25,19 @@ namespace BPCalculator.BddTests.Steps
         [Then(@"the category should be ""(.*)""")]
         public void ThenTheCategoryShouldBe(string expected) =>
             Assert.AreEqual(Enum.Parse<BPCategory>(expected), _result);
+
+        [When(@"I ask for the mean arterial pressure")]
+        public void WhenIAskForTheMeanArterialPressure() => _map = _bp.MeanArterialPressure;
+
+        [Then(@"the mean arterial pressure should be (.*)")]
+        public void ThenTheMeanArterialPressureShouldBe(double expected) =>
+            Assert.AreEqual(expected, _map, 0.05);
+
+        [When(@"I ask for the mean arterial pressure band")]
+        public void WhenIAskForTheMeanArterialPressureBand() => _mapBand = _bp.MeanArterialPressureCategory;
+
+        [Then(@"the mean arterial pressure band should be ""(.*)""")]
+        public void ThenTheMeanArterialPressureBandShouldBe(string expected) =>
+            Assert.AreEqual(Enum.Parse<MapCategory>(expected), _mapBand);
     }
 }

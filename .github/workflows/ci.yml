@@ -12,6 +12,9 @@ permissions:
 env:
   DOTNET_VERSION: '9.0.x'
   BUILD_CONFIGURATION: Release
+  # Promoted to workflow scope so the Sonar steps can be skipped with a plain
+  # env expression when the secret has not been configured on the repository.
+  SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
 jobs:
   build-and-test:
@@ -32,17 +35,18 @@ jobs:
           java-version: '17'      # required by the SonarScanner
 
       - name: Cache SonarCloud scanner
+        if: env.SONAR_TOKEN != ''
         uses: actions/cache@v4
         with:
           path: ~/.dotnet/tools
           key: ${{ runner.os }}-sonar-scanner
 
       - name: Install SonarCloud scanner
+        if: env.SONAR_TOKEN != ''
         run: dotnet tool install --global dotnet-sonarscanner
 
       - name: Begin SonarCloud analysis
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        if: env.SONAR_TOKEN != ''
         run: >
           dotnet sonarscanner begin
           /k:"${{ vars.SONAR_PROJECT_KEY }}"
@@ -52,6 +56,10 @@ jobs:
           /d:sonar.cs.opencover.reportsPaths="**/coverage.opencover.xml"
           /d:sonar.exclusions="**/wwwroot/lib/**,**/*.feature.cs"
           /d:sonar.qualitygate.wait=true
+
+      - name: Report skipped SonarCloud analysis
+        if: env.SONAR_TOKEN == ''
+        run: echo "::warning::SONAR_TOKEN is not configured, static analysis was skipped"
 
       - name: Restore
         run: dotnet restore
@@ -77,8 +85,7 @@ jobs:
           --logger "trx;LogFileName=bdd-tests.trx"
 
       - name: End SonarCloud analysis
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        if: env.SONAR_TOKEN != ''
         run: dotnet sonarscanner end /d:sonar.token="$env:SONAR_TOKEN"
 
       - name: Publish web app

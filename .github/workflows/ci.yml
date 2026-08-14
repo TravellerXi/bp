@@ -2,9 +2,12 @@ name: CI
 
 on:
   push:
-    branches: [master]
+    branches: [master, develop]
   pull_request:
-    branches: [master]
+    branches: [master, develop]
+
+permissions:
+  contents: read
 
 env:
   DOTNET_VERSION: '9.0.x'
@@ -31,7 +34,7 @@ jobs:
       - name: Cache SonarCloud scanner
         uses: actions/cache@v4
         with:
-          path: ~/.sonar/scanner
+          path: ~/.dotnet/tools
           key: ${{ runner.os }}-sonar-scanner
 
       - name: Install SonarCloud scanner
@@ -47,6 +50,8 @@ jobs:
           /d:sonar.token="$env:SONAR_TOKEN"
           /d:sonar.host.url="https://sonarcloud.io"
           /d:sonar.cs.opencover.reportsPaths="**/coverage.opencover.xml"
+          /d:sonar.exclusions="**/wwwroot/lib/**,**/*.feature.cs"
+          /d:sonar.qualitygate.wait=true
 
       - name: Restore
         run: dotnet restore
@@ -62,7 +67,8 @@ jobs:
           /p:CollectCoverage=true
           /p:CoverletOutputFormat=opencover
           /p:CoverletOutput=./coverage.opencover.xml
-          /p:Threshold=80 /p:ThresholdType=line /p:ThresholdStat=total
+          /p:Include="[BPCalculator]BPCalculator.BloodPressure"
+          /p:Threshold=90 /p:ThresholdType=branch /p:ThresholdStat=total
 
       - name: BDD tests (Reqnroll / Gherkin)
         run: >
@@ -93,6 +99,13 @@ jobs:
         with:
           name: test-results
           path: '**/*.trx'
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: '**/coverage.opencover.xml'
 
   dependency-check:
     name: Dependency vulnerability scan

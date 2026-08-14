@@ -36,12 +36,14 @@ test.describe('BP category calculator', () => {
 
   test('systolic must be greater than diastolic', async ({ page }) => {
     await submit(page, 90, 95);
-    await expect(page.locator('.text-danger')).toContainText('Systolic must be greater than Diastolic');
+    await expect(page.locator('div[class*="validation-summary"]'))
+      .toContainText('Systolic must be greater than Diastolic');
   });
 
   test('out-of-range systolic is rejected', async ({ page }) => {
     await submit(page, 250, 80);
-    await expect(page.locator('.text-danger')).toContainText('Invalid Systolic Value');
+    await expect(page.locator('[data-valmsg-for="BP.Systolic"]'))
+      .toContainText('Invalid Systolic Value');
   });
 });
 

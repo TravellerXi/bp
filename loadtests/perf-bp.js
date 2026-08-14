@@ -27,9 +27,10 @@ export default function () {
 
   const token = get.html().find('input[name=__RequestVerificationToken]').first().attr('value');
 
-  // Stay inside the model's validation ranges and keep systolic > diastolic.
+  // Stay inside the model's validation ranges: systolic must clear its own
+  // minimum as well as being above the diastolic reading.
   const diastolic = randomIntBetween(40, 99);
-  const systolic = randomIntBetween(diastolic + 1, 190);
+  const systolic = randomIntBetween(Math.max(diastolic + 1, 70), 190);
 
   const res = http.post(
     `${BASE_URL}/`,

@@ -25,7 +25,7 @@
             <div class="form-group">
                 <input type="submit" value="Submit" class="btn btn-default" />
             </div>
-            @if (ViewData.ModelState.IsValid)
+            @if (Model.ShowResult && ViewData.ModelState.IsValid)
             {
                 <div class="form-group">
                     <span data-testid="bp-category">@Html.DisplayFor(model => model.BP.Category)</span>

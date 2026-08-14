@@ -15,6 +15,7 @@ on:
 permissions:
   id-token: write        # OIDC federated credential, no long-lived secret
   contents: read
+  issues: write          # zaproxy action files its report as an issue
   actions: read          # required to download an artifact from another workflow run
 
 env:
@@ -38,6 +39,8 @@ jobs:
       host: ${{ steps.infra.outputs.host }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
 
       - uses: azure/login@v2
         with:
@@ -46,6 +49,9 @@ jobs:
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       # Infrastructure as code runs inside the pipeline, not by hand.
+      - name: Ensure resource group exists
+        run: az group create --name $RESOURCE_GROUP --location $LOCATION --output none
+
       - name: What-if (preview infrastructure changes)
         run: >
           az deployment group what-if
@@ -85,12 +91,21 @@ jobs:
       url: https://${{ steps.infra.outputs.host }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
 
       - uses: azure/login@v2
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: What-if (preview qa changes)
+        run: >
+          az deployment group what-if
+          --resource-group $RESOURCE_GROUP
+          --template-file infra/main.bicep
+          --parameters environmentName=qa namePrefix=$NAME_PREFIX location=$LOCATION
 
       - name: Deploy infrastructure
         id: infra
@@ -121,7 +136,7 @@ jobs:
       - name: Install Playwright
         working-directory: e2e
         run: |
-          npm ci
+          npm install --no-audit --no-fund
           npx playwright install --with-deps chromium firefox webkit
       - name: E2E tests (chromium, firefox, webkit)
         working-directory: e2e
@@ -159,6 +174,8 @@ jobs:
       url: https://${{ vars.NAME_PREFIX }}-bpcalculator-prod-staging.azurewebsites.net
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
 
       - uses: azure/login@v2
         with:
@@ -219,8 +236,20 @@ jobs:
           --target-slot production
 
       - name: Post-swap smoke test
+        id: postswap
         run: |
           url="https://${NAME_PREFIX}-bpcalculator-prod.azurewebsites.net"
           code=$(curl -s -o /dev/null -w '%{http_code}' --retry 5 --retry-delay 10 "$url")
           echo "production returned $code"
           test "$code" = "200"
+
+      # Green side of blue/green: the previous production instance is sitting in
+      # the slot, so recovery is the same swap in reverse.
+      - name: Roll back by swapping again
+        if: failure() && steps.postswap.outcome == 'failure'
+        run: >
+          az webapp deployment slot swap
+          --resource-group $RESOURCE_GROUP
+          --name ${NAME_PREFIX}-bpcalculator-prod
+          --slot staging
+          --target-slot production

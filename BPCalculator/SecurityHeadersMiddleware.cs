@@ -35,11 +35,12 @@ namespace BPCalculator
                 headers["Cache-Control"] = "no-store, no-cache, must-revalidate";
                 headers["Pragma"] = "no-cache";
 
-                // ZAP: Server Leaks Information via "Server" HTTP Response Header
-                headers.Remove("Server");
-                headers.Remove("X-Powered-By");
-
                 await next();
+
+                // ZAP: Server Leaks Information. Kestrel and IIS append these while the
+                // response is being written, so they can only be stripped on the way out.
+                context.Response.Headers.Remove("Server");
+                context.Response.Headers.Remove("X-Powered-By");
             });
     }
 }

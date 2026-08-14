@@ -1,0 +1,261 @@
+name: CD
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [master]
+  workflow_dispatch:
+    inputs:
+      ci_run_id:
+        description: 'Run id of the CI workflow whose artifact should be deployed'
+        required: true
+        type: string
+
+permissions:
+  id-token: write        # OIDC federated credential, no long-lived secret
+  contents: read
+  issues: write          # zaproxy action files its report as an issue
+  actions: read          # required to download an artifact from another workflow run
+
+env:
+  DOTNET_VERSION: '9.0.x'
+  NAME_PREFIX: ${{ vars.NAME_PREFIX }}
+  RESOURCE_GROUP: ${{ vars.RESOURCE_GROUP }}
+  LOCATION: northeurope
+  # A manual run must name the CI run to promote; there is no artifact on this run.
+  CI_RUN_ID: ${{ github.event.workflow_run.id || inputs.ci_run_id }}
+
+jobs:
+  # ---------------------------------------------------------------- dev
+  dev:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    name: Provision + deploy to dev
+    runs-on: ubuntu-latest
+    environment:
+      name: dev
+      url: https://${{ steps.infra.outputs.host }}
+    outputs:
+      host: ${{ steps.infra.outputs.host }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
+
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      # Infrastructure as code runs inside the pipeline, not by hand.
+      - name: Ensure resource group exists
+        run: az group create --name $RESOURCE_GROUP --location $LOCATION --output none
+
+      - name: What-if (preview infrastructure changes)
+        run: >
+          az deployment group what-if
+          --resource-group $RESOURCE_GROUP
+          --template-file infra/main.bicep
+          --parameters environmentName=dev namePrefix=$NAME_PREFIX location=$LOCATION
+
+      - name: Deploy infrastructure
+        id: infra
+        run: |
+          host=$(az deployment group create \
+            --resource-group "$RESOURCE_GROUP" \
+            --template-file infra/main.bicep \
+            --parameters environmentName=dev namePrefix="$NAME_PREFIX" location="$LOCATION" \
+            --query properties.outputs.appHostName.value -o tsv)
+          echo "host=$host" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: webapp
+          path: ./publish
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ env.CI_RUN_ID }}
+
+      - uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.NAME_PREFIX }}-bpcalculator-dev
+          package: ./publish
+
+  # ---------------------------------------------------------------- qa
+  qa:
+    name: Deploy to qa, then E2E + ZAP + load
+    needs: dev
+    runs-on: ubuntu-latest
+    environment:
+      name: qa            # reviewers configured on this GitHub Environment = quality gate
+      url: https://${{ steps.infra.outputs.host }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
+
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: What-if (preview qa changes)
+        run: >
+          az deployment group what-if
+          --resource-group $RESOURCE_GROUP
+          --template-file infra/main.bicep
+          --parameters environmentName=qa namePrefix=$NAME_PREFIX location=$LOCATION
+
+      - name: Deploy infrastructure
+        id: infra
+        run: |
+          host=$(az deployment group create \
+            --resource-group "$RESOURCE_GROUP" \
+            --template-file infra/main.bicep \
+            --parameters environmentName=qa namePrefix="$NAME_PREFIX" location="$LOCATION" \
+            --query properties.outputs.appHostName.value -o tsv)
+          echo "host=$host" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: webapp
+          path: ./publish
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ env.CI_RUN_ID }}
+
+      - uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.NAME_PREFIX }}-bpcalculator-qa
+          package: ./publish
+
+      # E2E runs against the deployed environment, not against localhost.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install Playwright
+        working-directory: e2e
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium firefox webkit
+      - name: E2E tests (chromium, firefox, webkit)
+        working-directory: e2e
+        env:
+          BASE_URL: https://${{ steps.infra.outputs.host }}
+        run: npx playwright test
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: e2e/playwright-report
+
+      - name: OWASP ZAP full scan
+        uses: zaproxy/action-full-scan@v0.13.0
+        with:
+          target: https://${{ steps.infra.outputs.host }}
+          rules_file_name: .zap/rules.tsv
+          cmd_options: '-a'
+          fail_action: true
+
+      - name: k6 load test
+        uses: grafana/setup-k6-action@v1
+      - name: Run k6
+        env:
+          BASE_URL: https://${{ steps.infra.outputs.host }}
+        run: k6 run loadtests/perf-bp.js
+
+  # ------------------------------------------------- staging slot (blue)
+  staging:
+    name: Deploy to prod staging slot
+    needs: qa
+    runs-on: ubuntu-latest
+    environment:
+      name: staging       # manual pre-approval configured here
+      url: https://${{ vars.NAME_PREFIX }}-bpcalculator-prod-staging.azurewebsites.net
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
+
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy infrastructure (prod plan + staging slot)
+        run: >
+          az deployment group create
+          --resource-group $RESOURCE_GROUP
+          --template-file infra/main.bicep
+          --parameters environmentName=prod namePrefix=$NAME_PREFIX location=$LOCATION
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: webapp
+          path: ./publish
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ env.CI_RUN_ID }}
+
+      - uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.NAME_PREFIX }}-bpcalculator-prod
+          slot-name: staging
+          package: ./publish
+
+      - name: Smoke test the slot before it is eligible for swap
+        shell: bash
+        run: |
+          url="https://${NAME_PREFIX}-bpcalculator-prod-staging.azurewebsites.net"
+          # Assert on the body. A status-code probe passes against a response whose
+          # headers are fine but whose body is truncated - the exact failure this
+          # project shipped and had to fix. --fail-with-body also surfaces the
+          # transfer error (curl 56) that a truncated body produces.
+          body=$(curl -sS --fail-with-body --retry 5 --retry-delay 10 "$url")
+          grep -q 'BP Category Calculator' <<< "$body"
+          echo "smoke test ok: ${#body} bytes, expected content present"
+
+  # ------------------------------------------------- swap into production
+  production:
+    name: VIP swap staging into production
+    needs: staging
+    runs-on: ubuntu-latest
+    environment:
+      name: production    # second manual pre-approval
+      url: https://${{ vars.NAME_PREFIX }}-bpcalculator-prod.azurewebsites.net
+    steps:
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      # Blue/green: the warmed slot becomes production, the old production
+      # becomes the slot and is the rollback target.
+      - name: Swap slots
+        run: >
+          az webapp deployment slot swap
+          --resource-group $RESOURCE_GROUP
+          --name ${NAME_PREFIX}-bpcalculator-prod
+          --slot staging
+          --target-slot production
+
+      - name: Post-swap smoke test
+        id: postswap
+        shell: bash
+        run: |
+          url="https://${NAME_PREFIX}-bpcalculator-prod.azurewebsites.net"
+          body=$(curl -sS --fail-with-body --retry 5 --retry-delay 10 "$url")
+          grep -q 'BP Category Calculator' <<< "$body"
+          echo "production ok: ${#body} bytes, expected content present"
+
+      # Green side of blue/green: the previous production instance is sitting in
+      # the slot, so recovery is the same swap in reverse.
+      - name: Roll back by swapping again
+        if: failure() && steps.postswap.outcome == 'failure'
+        run: >
+          az webapp deployment slot swap
+          --resource-group $RESOURCE_GROUP
+          --name ${NAME_PREFIX}-bpcalculator-prod
+          --slot staging
+          --target-slot production

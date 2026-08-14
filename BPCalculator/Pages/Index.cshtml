@@ -25,10 +25,15 @@
             <div class="form-group">
                 <input type="submit" value="Submit" class="btn btn-default" />
             </div>
-            @if (ViewData.ModelState.IsValid)
+            @if (Model.ShowResult && ViewData.ModelState.IsValid)
             {
                 <div class="form-group">
-                    @Html.DisplayFor(model => model.BP.Category, new { htmlAttributes = new { @class = "form-control" } })
+                    <span data-testid="bp-category">@Html.DisplayFor(model => model.BP.Category)</span>
+                </div>
+                <div class="form-group">
+                    <label class="control-label">Mean Arterial Pressure</label>
+                    <span data-testid="map-value" class="form-control">@Model.BP.MeanArterialPressure mmHg</span>
+                    <span data-testid="map-category">@Html.DisplayFor(model => model.BP.MeanArterialPressureCategory)</span>
                 </div>
             }
         </form>

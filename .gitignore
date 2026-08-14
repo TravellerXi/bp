@@ -259,3 +259,14 @@ paket-files/
 # Python Tools for Visual Studio (PTVS)
 __pycache__/
 *.pyc
+# Reqnroll generated code-behind
+*.feature.cs
+
+# coverlet intermediate output
+coverage.json
+coverage.opencover.xml
+
+# Playwright
+e2e/node_modules/
+e2e/playwright-report/
+e2e/test-results/

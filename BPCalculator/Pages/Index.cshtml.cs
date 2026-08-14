@@ -8,7 +8,10 @@ namespace BPCalculator.Pages
     public class BloodPressureModel : PageModel
     {
         [BindProperty]                              // bound on POST
-        public BloodPressure BP { get; set; }
+        public BloodPressure BP { get; set; } = new();
+
+        // Results are meaningless until the user has actually submitted a reading.
+        public bool ShowResult { get; private set; }
 
         // setup initial data
         public void OnGet()
@@ -19,6 +22,8 @@ namespace BPCalculator.Pages
         // POST, validate
         public IActionResult OnPost()
         {
+            ShowResult = true;
+
             // extra validation
             if (!(BP.Systolic > BP.Diastolic))
             {

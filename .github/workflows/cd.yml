@@ -120,7 +120,7 @@ jobs:
     needs: dev
     runs-on: ubuntu-latest
     environment:
-      name: qa            # reviewers configured on this GitHub Environment = quality gate
+      name: qa            # no reviewers here; the gate is the automated E2E, ZAP and load suites below
       url: https://${{ steps.infra.outputs.host }}
     steps:
       - uses: actions/checkout@v4

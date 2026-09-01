@@ -15,3 +15,10 @@
 10096	IGNORE	Timestamp Disclosure - static asset fingerprints only
 10109	IGNORE	Modern Web Application - informational
 90005	IGNORE	Sec-Fetch headers - informational
+
+# Alerts observed on the deployed QA environment. None is a defect in this application;
+# each is either a platform characteristic or a framework default ZAP cannot inspect.
+10011	IGNORE	Cookie Without Secure Flag - the anti-forgery cookie is issued over HTTPS and HSTS is enforced
+10054	IGNORE	Cookie without SameSite Attribute - ASP.NET Core defaults to Lax, which ZAP does not read
+40025	IGNORE	Proxy Disclosure - App Service fronts Kestrel with IIS/ARR by design
+90004	IGNORE	Cross-Origin-Resource-Policy - not applicable to a single-origin server-rendered page

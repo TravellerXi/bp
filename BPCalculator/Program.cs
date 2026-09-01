@@ -20,8 +20,10 @@ namespace BPCalculator
             Host.CreateDefaultBuilder(args)
                 .ConfigureWebHostDefaults(webBuilder =>
                 {
-                    // ZAP 10036: stop Kestrel emitting its Server header at all.
-                    webBuilder.UseKestrel(options => options.AddServerHeader = false);
+                    // ZAP 10036: stop Kestrel emitting its Server header at all. ConfigureKestrel
+                    // rather than UseKestrel, because UseKestrel replaces the server outright and
+                    // breaks in-process IIS hosting on App Service.
+                    webBuilder.ConfigureKestrel(options => options.AddServerHeader = false);
                     webBuilder.UseStartup<Startup>();
                 });
     }

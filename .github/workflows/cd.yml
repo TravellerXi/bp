@@ -22,7 +22,7 @@ env:
   DOTNET_VERSION: '9.0.x'
   NAME_PREFIX: ${{ vars.NAME_PREFIX }}
   RESOURCE_GROUP: ${{ vars.RESOURCE_GROUP }}
-  LOCATION: northeurope
+  LOCATION: westeurope
   # A manual run must name the CI run to promote; there is no artifact on this run.
   CI_RUN_ID: ${{ github.event.workflow_run.id || inputs.ci_run_id }}
 

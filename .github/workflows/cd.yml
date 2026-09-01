@@ -12,6 +12,13 @@ on:
         required: true
         type: string
 
+# Both triggers can fire for the same commit, and every run targets the same four
+# environments. Queue them instead of cancelling: a run interrupted between the
+# staging deploy and the slot swap would leave production on an unverified slot.
+concurrency:
+  group: cd-${{ github.ref }}
+  cancel-in-progress: false
+
 permissions:
   id-token: write        # OIDC federated credential, no long-lived secret
   contents: read
